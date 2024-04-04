@@ -616,15 +616,18 @@ static void control_sequence_parse(struct flanterm_context *ctx, uint8_t c) {
                 ctx->esc_values[0] = ctx->rows - 1;
             ctx->set_cursor_pos(ctx, ctx->esc_values[1], ctx->esc_values[0]);
             break;
-        case 'M':
-            for (size_t i = 0; i < ctx->esc_values[0]; i++) {
+        case 'M': {
+            size_t count = ctx->esc_values[0] > ctx->rows ? ctx->rows : ctx->esc_values[0];
+            for (size_t i = 0; i < count; i++) {
                 ctx->scroll(ctx);
             }
             break;
+        }
         case 'L': {
             size_t old_scroll_top_margin = ctx->scroll_top_margin;
             ctx->scroll_top_margin = y;
-            for (size_t i = 0; i < ctx->esc_values[0]; i++) {
+            size_t count = ctx->esc_values[0] > ctx->rows ? ctx->rows : ctx->esc_values[0];
+            for (size_t i = 0; i < count; i++) {
                 ctx->revscroll(ctx);
             }
             ctx->scroll_top_margin = old_scroll_top_margin;
@@ -700,11 +703,13 @@ static void control_sequence_parse(struct flanterm_context *ctx, uint8_t c) {
                 ctx->move_character(ctx, i - ctx->esc_values[0], y, i, y);
             ctx->set_cursor_pos(ctx, ctx->cols - ctx->esc_values[0], y);
             // FALLTHRU
-        case 'X':
-            for (size_t i = 0; i < ctx->esc_values[0]; i++)
+        case 'X': {
+            size_t count = ctx->esc_values[0] > ctx->cols ? ctx->cols : ctx->esc_values[0];
+            for (size_t i = 0; i < count; i++)
                 ctx->raw_putchar(ctx, ' ');
             ctx->set_cursor_pos(ctx, x, y);
             break;
+        }
         case 'm':
             sgr(ctx);
             break;
