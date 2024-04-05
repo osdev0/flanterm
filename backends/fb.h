@@ -36,6 +36,10 @@ extern "C" {
 
 #include "../flanterm.h"
 
+#ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
+#  define FLANTERM_FB_DISABLE_CANVAS 1
+#endif
+
 #define FLANTERM_FB_FONT_GLYPHS 256
 
 struct flanterm_fb_char {

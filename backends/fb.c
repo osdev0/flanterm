@@ -35,7 +35,10 @@ void *memcpy(void *, const void *, size_t);
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
 
 #ifndef FLANTERM_FB_BUMP_ALLOC_POOL_SIZE
-#define FLANTERM_FB_BUMP_ALLOC_POOL_SIZE (64*1024*1024)
+#define FLANTERM_FB_BUMP_ALLOC_POOL_SIZE 873000
+
+#define FLANTERM_FB_WIDTH_LIMIT 1920
+#define FLANTERM_FB_HEIGHT_LIMIT 1200
 #endif
 
 static uint8_t bump_alloc_pool[FLANTERM_FB_BUMP_ALLOC_POOL_SIZE];
@@ -884,6 +887,17 @@ struct flanterm_context *flanterm_fb_init(
 ) {
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
     size_t orig_bump_alloc_ptr = bump_alloc_ptr;
+
+    // Limit terminal size if needed
+    if (width > FLANTERM_FB_WIDTH_LIMIT || height > FLANTERM_FB_HEIGHT_LIMIT) {
+        size_t width_limit = width > FLANTERM_FB_WIDTH_LIMIT ? FLANTERM_FB_WIDTH_LIMIT : width;
+        size_t height_limit = height > FLANTERM_FB_HEIGHT_LIMIT ? FLANTERM_FB_HEIGHT_LIMIT : height;
+
+        framebuffer = (uint32_t *)((uintptr_t)framebuffer + ((((height / 2) - (height_limit / 2)) * pitch) + (((width / 2) - (width_limit / 2)) * 4)));
+
+        width = width_limit;
+        height = height_limit;
+    }
 #endif
 
 #ifdef FLANTERM_FB_SUPPORT_BPP
