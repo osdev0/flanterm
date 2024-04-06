@@ -367,7 +367,7 @@ set_bg_bright:
                         (fg ? ctx->set_text_fg : ctx->set_text_bg)(ctx, col);
                     } else if (col < 16) {
                         (fg ? ctx->set_text_fg_bright : ctx->set_text_bg_bright)(ctx, col - 8);
-                    } else {
+                    } else if (col < 256) {
                         uint32_t rgb_value = col256[col - 16];
                         (fg ? ctx->set_text_fg_rgb : ctx->set_text_bg_rgb)(ctx, rgb_value);
                     }
