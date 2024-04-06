@@ -25,6 +25,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "../flanterm.h"
 #include "fb.h"
@@ -53,6 +54,8 @@ static void *bump_alloc(size_t s) {
     bump_alloc_ptr = next_ptr;
     return ret;
 }
+
+static bool bump_allocated_instance = false;
 
 #endif
 
@@ -850,6 +853,12 @@ static void flanterm_fb_deinit(struct flanterm_context *_ctx, void (*_free)(void
     struct flanterm_fb_context *ctx = (void *)_ctx;
 
     if (_free == NULL) {
+#ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
+        if (bump_allocated_instance == true) {
+            bump_alloc_ptr = 0;
+            bump_allocated_instance = false;
+        }
+#endif
         return;
     }
 
@@ -886,8 +895,6 @@ struct flanterm_context *flanterm_fb_init(
     size_t margin
 ) {
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
-    size_t orig_bump_alloc_ptr = bump_alloc_ptr;
-
     // Limit terminal size if needed
     if (width > FLANTERM_FB_WIDTH_LIMIT || height > FLANTERM_FB_HEIGHT_LIMIT) {
         size_t width_limit = width > FLANTERM_FB_WIDTH_LIMIT ? FLANTERM_FB_WIDTH_LIMIT : width;
@@ -908,6 +915,9 @@ struct flanterm_context *flanterm_fb_init(
 
     if (_malloc == NULL) {
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
+        if (bump_allocated_instance == true) {
+            return NULL;
+        }
         _malloc = bump_alloc;
 #else
         return NULL;
@@ -1138,12 +1148,18 @@ struct flanterm_context *flanterm_fb_init(
     flanterm_context_reinit(_ctx);
     flanterm_fb_full_refresh(_ctx);
 
+#ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
+    if (_malloc == bump_alloc) {
+        bump_allocated_instance = true;
+    }
+#endif
+
     return _ctx;
 
 fail:
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
     if (_malloc == bump_alloc) {
-        bump_alloc_ptr = orig_bump_alloc_ptr;
+        bump_alloc_ptr = 0;
         return NULL;
     }
 #endif
