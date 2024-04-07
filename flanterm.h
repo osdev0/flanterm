@@ -62,7 +62,6 @@ struct flanterm_context {
     bool cursor_enabled;
     bool scroll_enabled;
     bool control_sequence;
-    bool csi;
     bool escape;
     bool osc;
     bool osc_escape;

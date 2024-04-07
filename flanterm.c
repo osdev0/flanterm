@@ -74,7 +74,6 @@ void flanterm_context_reinit(struct flanterm_context *ctx) {
     ctx->cursor_enabled = true;
     ctx->scroll_enabled = true;
     ctx->control_sequence = false;
-    ctx->csi = false;
     ctx->escape = false;
     ctx->osc = false;
     ctx->osc_escape = false;
@@ -816,11 +815,6 @@ static void escape_parse(struct flanterm_context *ctx, uint8_t c) {
         return;
     }
 
-    if (ctx->csi == true) {
-        ctx->csi = false;
-        goto is_csi;
-    }
-
     size_t x, y;
     ctx->get_cursor_pos(ctx, &x, &y);
 
@@ -830,7 +824,6 @@ static void escape_parse(struct flanterm_context *ctx, uint8_t c) {
             ctx->osc = true;
             return;
         case '[':
-is_csi:
             for (size_t i = 0; i < FLANTERM_MAX_ESC_VALUES; i++)
                 ctx->esc_values[i] = 0;
             ctx->esc_values_i = 0;
@@ -1207,7 +1200,6 @@ static void flanterm_putchar(struct flanterm_context *ctx, uint8_t c) {
     if (ctx->discard_next || (c == 0x18 || c == 0x1a)) {
         ctx->discard_next = false;
         ctx->escape = false;
-        ctx->csi = false;
         ctx->control_sequence = false;
         ctx->unicode_remaining = 0;
         ctx->osc = false;
@@ -1283,9 +1275,6 @@ unicode_error:
         case 0x00:
         case 0x7f:
             return;
-        case 0x9b:
-            ctx->csi = true;
-            // FALLTHRU
         case 0x1b:
             ctx->escape_offset = 0;
             ctx->escape = true;
