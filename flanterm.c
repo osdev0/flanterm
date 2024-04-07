@@ -1340,5 +1340,7 @@ unicode_error:
 
     if (c >= 0x20 && c <= 0x7e) {
         ctx->raw_putchar(ctx, c);
+    } else {
+        ctx->raw_putchar(ctx, 0xfe);
     }
 }
