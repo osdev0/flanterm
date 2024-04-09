@@ -18,6 +18,7 @@ struct flanterm_context *ft_ctx = flanterm_fb_init(
         red_mask_size, red_mask_shift,
         green_mask_size, green_mask_shift,
         blue_mask_size, blue_mask_shift,
+        NULL,
         NULL, NULL,
         NULL, NULL,
         NULL, NULL,
