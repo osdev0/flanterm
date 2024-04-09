@@ -406,7 +406,6 @@ static const uint8_t builtin_font[] = {
   0x00, 0x00, 0x00, 0x00
 };
 
-#ifdef FLANTERM_FB_SUPPORT_BPP
 static inline __attribute__((always_inline)) uint32_t convert_colour(struct flanterm_context *_ctx, uint32_t colour) {
     struct flanterm_fb_context *ctx = (void *)_ctx;
     uint32_t r = (colour >> 16) & 0xff;
@@ -414,9 +413,6 @@ static inline __attribute__((always_inline)) uint32_t convert_colour(struct flan
     uint32_t b =  colour & 0xff;
     return (r << ctx->red_mask_shift) | (g << ctx->green_mask_shift) | (b << ctx->blue_mask_shift);
 }
-#else
-#define convert_colour(CTX, COLOUR) (COLOUR)
-#endif
 
 static void flanterm_fb_save_state(struct flanterm_context *_ctx) {
     struct flanterm_fb_context *ctx = (void *)_ctx;
@@ -879,11 +875,9 @@ struct flanterm_context *flanterm_fb_init(
     void *(*_malloc)(size_t),
     void (*_free)(void *, size_t),
     uint32_t *framebuffer, size_t width, size_t height, size_t pitch,
-#ifdef FLANTERM_FB_SUPPORT_BPP
     uint8_t red_mask_size, uint8_t red_mask_shift,
     uint8_t green_mask_size, uint8_t green_mask_shift,
     uint8_t blue_mask_size, uint8_t blue_mask_shift,
-#endif
 #ifndef FLANTERM_FB_DISABLE_CANVAS
     uint32_t *canvas,
 #endif
@@ -907,14 +901,9 @@ struct flanterm_context *flanterm_fb_init(
         }
     }
 
-#ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
-#endif
-
-#ifdef FLANTERM_FB_SUPPORT_BPP
     if (red_mask_size < 8 || red_mask_size != green_mask_size || red_mask_size != blue_mask_size) {
         return NULL;
     }
-#endif
 
     if (_malloc == NULL) {
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
@@ -946,14 +935,12 @@ struct flanterm_context *flanterm_fb_init(
     struct flanterm_context *_ctx = (void *)ctx;
     memset(ctx, 0, sizeof(struct flanterm_fb_context));
 
-#ifdef FLANTERM_FB_SUPPORT_BPP
     ctx->red_mask_size = red_mask_size;
     ctx->red_mask_shift = red_mask_shift + (red_mask_size - 8);
     ctx->green_mask_size = green_mask_size;
     ctx->green_mask_shift = green_mask_shift + (green_mask_size - 8);
     ctx->blue_mask_size = blue_mask_size;
     ctx->blue_mask_shift = blue_mask_shift + (blue_mask_size - 8);
-#endif
 
     if (ansi_colours != NULL) {
         for (size_t i = 0; i < 8; i++) {
