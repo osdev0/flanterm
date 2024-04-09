@@ -135,30 +135,6 @@ struct flanterm_context *flanterm_fb_init(
     size_t margin
 );
 
-#ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
-static inline struct flanterm_context *flanterm_fb_simple_init(
-    uint32_t *framebuffer, size_t width, size_t height, size_t pitch,
-    uint8_t red_mask_size, uint8_t red_mask_shift,
-    uint8_t green_mask_size, uint8_t green_mask_shift,
-    uint8_t blue_mask_size, uint8_t blue_mask_shift
-) {
-    return flanterm_fb_init(
-        NULL,
-        NULL,
-        framebuffer, width, height, pitch,
-        red_mask_size, red_mask_shift,
-        green_mask_size, green_mask_shift,
-        blue_mask_size, blue_mask_shift,
-        NULL, NULL,
-        NULL, NULL,
-        NULL, NULL,
-        NULL, 0, 0, 1,
-        0, 0,
-        0
-    );
-}
-#endif
-
 #ifdef __cplusplus
 }
 #endif
