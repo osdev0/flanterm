@@ -36,10 +36,6 @@ extern "C" {
 
 #include "../flanterm.h"
 
-#ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
-#  define FLANTERM_FB_DISABLE_CANVAS 1
-#endif
-
 #define FLANTERM_FB_FONT_GLYPHS 256
 
 struct flanterm_fb_char {
@@ -86,10 +82,8 @@ struct flanterm_fb_context {
     uint32_t default_fg, default_bg;
     uint32_t default_fg_bright, default_bg_bright;
 
-#ifndef FLANTERM_FB_DISABLE_CANVAS
     size_t canvas_size;
     uint32_t *canvas;
-#endif
 
     size_t grid_size;
     size_t queue_size;
@@ -124,9 +118,7 @@ struct flanterm_context *flanterm_fb_init(
     uint8_t red_mask_size, uint8_t red_mask_shift,
     uint8_t green_mask_size, uint8_t green_mask_shift,
     uint8_t blue_mask_size, uint8_t blue_mask_shift,
-#ifndef FLANTERM_FB_DISABLE_CANVAS
-    uint32_t *canvas,
-#endif
+    uint32_t *canvas, // If nulled, no canvas.
     uint32_t *ansi_colours, uint32_t *ansi_bright_colours, // If nulled, default.
     uint32_t *default_bg, uint32_t *default_fg, // If nulled, default.
     uint32_t *default_bg_bright, uint32_t *default_fg_bright, // If nulled, default.
