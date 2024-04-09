@@ -894,6 +894,19 @@ struct flanterm_context *flanterm_fb_init(
     size_t font_scale_x, size_t font_scale_y,
     size_t margin
 ) {
+    if (font_scale_x == 0 || font_scale_y == 0) {
+        font_scale_x = 1;
+        font_scale_y = 1;
+        if (width >= (1920 + 1920 / 3) && height >= (1080 + 1080 / 3)) {
+            font_scale_x = 2;
+            font_scale_y = 2;
+        }
+        if (width >= (3840 + 3840 / 3) && height >= (2160 + 2160 / 3)) {
+            font_scale_x = 4;
+            font_scale_y = 4;
+        }
+    }
+
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
     // Limit terminal size if needed
     if (width > FLANTERM_FB_WIDTH_LIMIT || height > FLANTERM_FB_HEIGHT_LIMIT) {
