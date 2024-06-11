@@ -1142,6 +1142,10 @@ struct flanterm_context *flanterm_fb_init(
     return _ctx;
 
 fail:
+    if (ctx == NULL) {
+        return NULL;
+    }
+
 #ifndef FLANTERM_FB_DISABLE_BUMP_ALLOC
     if (_malloc == bump_alloc) {
         bump_alloc_ptr = 0;
