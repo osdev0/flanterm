@@ -437,10 +437,42 @@ static void flanterm_fb_swap_palette(struct flanterm_context *_ctx) {
     ctx->text_fg = tmp;
 }
 
+/* Unscaled code path if font_scale_{x,y} == 1 */
+static void plot_char_unscaled(struct flanterm_fb_context *ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
+    uint32_t default_bg = ctx->default_bg;
+
+    x = ctx->offset_x + x * ctx->glyph_width;
+    y = ctx->offset_y + y * ctx->glyph_height;
+
+    bool *glyph = &ctx->font_bool[c->c * ctx->font_height * ctx->font_width];
+    // naming: fx,fy for font coordinates, gx,gy for glyph coordinates
+    for (size_t gy = 0; gy < ctx->glyph_height; gy++) {
+        volatile uint32_t *fb_line = ctx->framebuffer + x + (y + gy) * (ctx->pitch / 4);
+        uint32_t *canvas_line = ctx->canvas + x + (y + gy) * ctx->width;
+        bool *glyph_pointer = glyph + (gy * ctx->font_width);
+        for (size_t fx = 0; fx < ctx->font_width; fx++) {
+            uint32_t bg, fg;
+            if (ctx->canvas != NULL) {
+                bg = c->bg == 0xffffffff ? canvas_line[fx] : c->bg;
+                fg = c->fg == 0xffffffff ? canvas_line[fx] : c->fg;
+            } else {
+                bg = c->bg == 0xffffffff ? default_bg : c->bg;
+                fg = c->fg == 0xffffffff ? default_bg : c->fg;
+            }
+            fb_line[fx] = *(glyph_pointer++) ? fg : bg;
+        }
+    }
+}
+
 static void plot_char(struct flanterm_context *_ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
     struct flanterm_fb_context *ctx = (void *)_ctx;
 
     if (x >= _ctx->cols || y >= _ctx->rows) {
+        return;
+    }
+
+    if(ctx->font_scale_x == 1 && ctx->font_scale_y == 1) {
+        plot_char_unscaled(ctx, c, x, y);
         return;
     }
 
@@ -455,8 +487,8 @@ static void plot_char(struct flanterm_context *_ctx, struct flanterm_fb_char *c,
         uint8_t fy = gy / ctx->font_scale_y;
         volatile uint32_t *fb_line = ctx->framebuffer + x + (y + gy) * (ctx->pitch / 4);
         uint32_t *canvas_line = ctx->canvas + x + (y + gy) * ctx->width;
+        bool *glyph_pointer = glyph + (fy * ctx->font_width);
         for (size_t fx = 0; fx < ctx->font_width; fx++) {
-            bool draw = glyph[fy * ctx->font_width + fx];
             for (size_t i = 0; i < ctx->font_scale_x; i++) {
                 size_t gx = ctx->font_scale_x * fx + i;
                 uint32_t bg, fg;
@@ -467,8 +499,9 @@ static void plot_char(struct flanterm_context *_ctx, struct flanterm_fb_char *c,
                     bg = c->bg == 0xffffffff ? default_bg : c->bg;
                     fg = c->fg == 0xffffffff ? default_bg : c->fg;
                 }
-                fb_line[gx] = draw ? fg : bg;
+                fb_line[gx] = *glyph_pointer ? fg : bg;
             }
+            glyph_pointer++;
         }
     }
 }
