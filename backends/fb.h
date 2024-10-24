@@ -52,6 +52,8 @@ struct flanterm_fb_queue_item {
 struct flanterm_fb_context {
     struct flanterm_context term;
 
+    void (*plot_char)(struct flanterm_context *ctx, struct flanterm_fb_char *c, size_t x, size_t y);
+
     size_t font_width;
     size_t font_height;
     size_t glyph_width;

@@ -437,46 +437,12 @@ static void flanterm_fb_swap_palette(struct flanterm_context *_ctx) {
     ctx->text_fg = tmp;
 }
 
-/* Unscaled code path if font_scale_{x,y} == 1 */
-static void plot_char_unscaled(struct flanterm_fb_context *ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
-    uint32_t default_bg = ctx->default_bg;
-
-    x = ctx->offset_x + x * ctx->glyph_width;
-    y = ctx->offset_y + y * ctx->glyph_height;
-
-    bool *glyph = &ctx->font_bool[c->c * ctx->font_height * ctx->font_width];
-    // naming: fx,fy for font coordinates, gx,gy for glyph coordinates
-    for (size_t gy = 0; gy < ctx->glyph_height; gy++) {
-        volatile uint32_t *fb_line = ctx->framebuffer + x + (y + gy) * (ctx->pitch / 4);
-        uint32_t *canvas_line = ctx->canvas + x + (y + gy) * ctx->width;
-        bool *glyph_pointer = glyph + (gy * ctx->font_width);
-        for (size_t fx = 0; fx < ctx->font_width; fx++) {
-            uint32_t bg, fg;
-            if (ctx->canvas != NULL) {
-                bg = c->bg == 0xffffffff ? canvas_line[fx] : c->bg;
-                fg = c->fg == 0xffffffff ? canvas_line[fx] : c->fg;
-            } else {
-                bg = c->bg == 0xffffffff ? default_bg : c->bg;
-                fg = c->fg == 0xffffffff ? default_bg : c->fg;
-            }
-            fb_line[fx] = *(glyph_pointer++) ? fg : bg;
-        }
-    }
-}
-
-static void plot_char(struct flanterm_context *_ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
+static void plot_char_scaled_canvas(struct flanterm_context *_ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
     struct flanterm_fb_context *ctx = (void *)_ctx;
 
     if (x >= _ctx->cols || y >= _ctx->rows) {
         return;
     }
-
-    if(ctx->font_scale_x == 1 && ctx->font_scale_y == 1) {
-        plot_char_unscaled(ctx, c, x, y);
-        return;
-    }
-
-    uint32_t default_bg = ctx->default_bg;
 
     x = ctx->offset_x + x * ctx->glyph_width;
     y = ctx->offset_y + y * ctx->glyph_height;
@@ -491,14 +457,8 @@ static void plot_char(struct flanterm_context *_ctx, struct flanterm_fb_char *c,
         for (size_t fx = 0; fx < ctx->font_width; fx++) {
             for (size_t i = 0; i < ctx->font_scale_x; i++) {
                 size_t gx = ctx->font_scale_x * fx + i;
-                uint32_t bg, fg;
-                if (ctx->canvas != NULL) {
-                    bg = c->bg == 0xffffffff ? canvas_line[gx] : c->bg;
-                    fg = c->fg == 0xffffffff ? canvas_line[gx] : c->fg;
-                } else {
-                    bg = c->bg == 0xffffffff ? default_bg : c->bg;
-                    fg = c->fg == 0xffffffff ? default_bg : c->fg;
-                }
+                uint32_t bg = c->bg == 0xffffffff ? canvas_line[gx] : c->bg;
+                uint32_t fg = c->fg == 0xffffffff ? canvas_line[gx] : c->fg;
                 fb_line[gx] = *glyph_pointer ? fg : bg;
             }
             glyph_pointer++;
@@ -506,8 +466,38 @@ static void plot_char(struct flanterm_context *_ctx, struct flanterm_fb_char *c,
     }
 }
 
-#ifdef FLANTERM_FB_ENABLE_MASKING
-static void plot_char_masked(struct flanterm_context *_ctx, struct flanterm_fb_char *old, struct flanterm_fb_char *c, size_t x, size_t y) {
+static void plot_char_scaled_uncanvas(struct flanterm_context *_ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
+    struct flanterm_fb_context *ctx = (void *)_ctx;
+
+    if (x >= _ctx->cols || y >= _ctx->rows) {
+        return;
+    }
+
+    uint32_t default_bg = ctx->default_bg;
+
+    uint32_t bg = c->bg == 0xffffffff ? default_bg : c->bg;
+    uint32_t fg = c->fg == 0xffffffff ? default_bg : c->fg;
+
+    x = ctx->offset_x + x * ctx->glyph_width;
+    y = ctx->offset_y + y * ctx->glyph_height;
+
+    bool *glyph = &ctx->font_bool[c->c * ctx->font_height * ctx->font_width];
+    // naming: fx,fy for font coordinates, gx,gy for glyph coordinates
+    for (size_t gy = 0; gy < ctx->glyph_height; gy++) {
+        uint8_t fy = gy / ctx->font_scale_y;
+        volatile uint32_t *fb_line = ctx->framebuffer + x + (y + gy) * (ctx->pitch / 4);
+        bool *glyph_pointer = glyph + (fy * ctx->font_width);
+        for (size_t fx = 0; fx < ctx->font_width; fx++) {
+            for (size_t i = 0; i < ctx->font_scale_x; i++) {
+                size_t gx = ctx->font_scale_x * fx + i;
+                fb_line[gx] = *glyph_pointer ? fg : bg;
+            }
+            glyph_pointer++;
+        }
+    }
+}
+
+static void plot_char_unscaled_canvas(struct flanterm_context *_ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
     struct flanterm_fb_context *ctx = (void *)_ctx;
 
     if (x >= _ctx->cols || y >= _ctx->rows) {
@@ -517,35 +507,45 @@ static void plot_char_masked(struct flanterm_context *_ctx, struct flanterm_fb_c
     x = ctx->offset_x + x * ctx->glyph_width;
     y = ctx->offset_y + y * ctx->glyph_height;
 
-    uint32_t default_bg = ctx->default_bg;
-
-    bool *new_glyph = &ctx->font_bool[c->c * ctx->font_height * ctx->font_width];
-    bool *old_glyph = &ctx->font_bool[old->c * ctx->font_height * ctx->font_width];
+    bool *glyph = &ctx->font_bool[c->c * ctx->font_height * ctx->font_width];
+    // naming: fx,fy for font coordinates, gx,gy for glyph coordinates
     for (size_t gy = 0; gy < ctx->glyph_height; gy++) {
-        uint8_t fy = gy / ctx->font_scale_y;
         volatile uint32_t *fb_line = ctx->framebuffer + x + (y + gy) * (ctx->pitch / 4);
         uint32_t *canvas_line = ctx->canvas + x + (y + gy) * ctx->width;
+        bool *glyph_pointer = glyph + (gy * ctx->font_width);
         for (size_t fx = 0; fx < ctx->font_width; fx++) {
-            bool old_draw = old_glyph[fy * ctx->font_width + fx];
-            bool new_draw = new_glyph[fy * ctx->font_width + fx];
-            if (old_draw == new_draw)
-                continue;
-            for (size_t i = 0; i < ctx->font_scale_x; i++) {
-                size_t gx = ctx->font_scale_x * fx + i;
-                uint32_t bg, fg;
-                if (ctx->canvas != NULL) {
-                    bg = c->bg == 0xffffffff ? canvas_line[gx] : c->bg;
-                    fg = c->fg == 0xffffffff ? canvas_line[gx] : c->fg;
-                } else {
-                    bg = c->bg == 0xffffffff ? default_bg : c->bg;
-                    fg = c->fg == 0xffffffff ? default_bg : c->fg;
-                }
-                fb_line[gx] = new_draw ? fg : bg;
-            }
+            uint32_t bg = c->bg == 0xffffffff ? canvas_line[fx] : c->bg;
+            uint32_t fg = c->fg == 0xffffffff ? canvas_line[fx] : c->fg;
+            fb_line[fx] = *(glyph_pointer++) ? fg : bg;
         }
     }
 }
-#endif
+
+static void plot_char_unscaled_uncanvas(struct flanterm_context *_ctx, struct flanterm_fb_char *c, size_t x, size_t y) {
+    struct flanterm_fb_context *ctx = (void *)_ctx;
+
+    if (x >= _ctx->cols || y >= _ctx->rows) {
+        return;
+    }
+
+    uint32_t default_bg = ctx->default_bg;
+
+    uint32_t bg = c->bg == 0xffffffff ? default_bg : c->bg;
+    uint32_t fg = c->fg == 0xffffffff ? default_bg : c->fg;
+
+    x = ctx->offset_x + x * ctx->glyph_width;
+    y = ctx->offset_y + y * ctx->glyph_height;
+
+    bool *glyph = &ctx->font_bool[c->c * ctx->font_height * ctx->font_width];
+    // naming: fx,fy for font coordinates, gx,gy for glyph coordinates
+    for (size_t gy = 0; gy < ctx->glyph_height; gy++) {
+        volatile uint32_t *fb_line = ctx->framebuffer + x + (y + gy) * (ctx->pitch / 4);
+        bool *glyph_pointer = glyph + (gy * ctx->font_width);
+        for (size_t fx = 0; fx < ctx->font_width; fx++) {
+            fb_line[fx] = *(glyph_pointer++) ? fg : bg;
+        }
+    }
+}
 
 static inline bool compare_char(struct flanterm_fb_char *a, struct flanterm_fb_char *b) {
     return !(a->c != b->c || a->bg != b->bg || a->fg != b->fg);
@@ -773,7 +773,7 @@ static void draw_cursor(struct flanterm_context *_ctx) {
     uint32_t tmp = c.fg;
     c.fg = c.bg;
     c.bg = tmp;
-    plot_char(_ctx, &c, ctx->cursor_x, ctx->cursor_y);
+    ctx->plot_char(_ctx, &c, ctx->cursor_x, ctx->cursor_y);
     if (q != NULL) {
         ctx->grid[i] = q->c;
         ctx->map[i] = NULL;
@@ -793,23 +793,14 @@ static void flanterm_fb_double_buffer_flush(struct flanterm_context *_ctx) {
         if (ctx->map[offset] == NULL) {
             continue;
         }
-        #ifdef FLANTERM_FB_ENABLE_MASKING
-            struct flanterm_fb_char *old = &ctx->grid[offset];
-            if (q->c.bg == old->bg && q->c.fg == old->fg) {
-                plot_char_masked(_ctx, old, &q->c, q->x, q->y);
-            } else {
-                plot_char(_ctx, &q->c, q->x, q->y);
-            }
-        #else
-            plot_char(_ctx, &q->c, q->x, q->y);
-        #endif
+        ctx->plot_char(_ctx, &q->c, q->x, q->y);
         ctx->grid[offset] = q->c;
         ctx->map[offset] = NULL;
     }
 
     if ((ctx->old_cursor_x != ctx->cursor_x || ctx->old_cursor_y != ctx->cursor_y) || _ctx->cursor_enabled == false) {
         if (ctx->old_cursor_x < _ctx->cols && ctx->old_cursor_y < _ctx->rows) {
-            plot_char(_ctx, &ctx->grid[ctx->old_cursor_x + ctx->old_cursor_y * _ctx->cols], ctx->old_cursor_x, ctx->old_cursor_y);
+            ctx->plot_char(_ctx, &ctx->grid[ctx->old_cursor_x + ctx->old_cursor_y * _ctx->cols], ctx->old_cursor_x, ctx->old_cursor_y);
         }
     }
 
@@ -860,7 +851,7 @@ static void flanterm_fb_full_refresh(struct flanterm_context *_ctx) {
         size_t x = i % _ctx->cols;
         size_t y = i / _ctx->cols;
 
-        plot_char(_ctx, &ctx->grid[i], x, y);
+        ctx->plot_char(_ctx, &ctx->grid[i], x, y);
     }
 
     if (_ctx->cursor_enabled) {
@@ -1136,6 +1127,20 @@ struct flanterm_context *flanterm_fb_init(
         }
         for (size_t i = 0; i < ctx->width * ctx->height; i++) {
             ctx->canvas[i] = convert_colour(_ctx, canvas[i]);
+        }
+    }
+
+    if (font_scale_x == 1 && font_scale_y == 1) {
+        if (canvas == NULL) {
+            ctx->plot_char = plot_char_unscaled_uncanvas;
+        } else {
+            ctx->plot_char = plot_char_unscaled_canvas;
+        }
+    } else {
+        if (canvas == NULL) {
+            ctx->plot_char = plot_char_scaled_uncanvas;
+        } else {
+            ctx->plot_char = plot_char_scaled_canvas;
         }
     }
 
