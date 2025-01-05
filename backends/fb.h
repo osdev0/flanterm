@@ -86,6 +86,10 @@ struct flanterm_fb_context {
 
     size_t canvas_size;
     uint32_t *canvas;
+    uint32_t *sixel_canvas;
+
+    size_t sixel_start_y;
+    size_t sixel_end_y;
 
     size_t grid_size;
     size_t queue_size;
@@ -113,9 +117,6 @@ struct flanterm_fb_context {
 };
 
 struct flanterm_context *flanterm_fb_init(
-    /* If _malloc and _free are nulled, use the bump allocated instance (1 use only). */
-    void *(*_malloc)(size_t),
-    void (*_free)(void *, size_t),
     uint32_t *framebuffer, size_t width, size_t height, size_t pitch,
     uint8_t red_mask_size, uint8_t red_mask_shift,
     uint8_t green_mask_size, uint8_t green_mask_shift,
