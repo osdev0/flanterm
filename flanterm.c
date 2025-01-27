@@ -461,12 +461,11 @@ static void osc_parse(struct flanterm_context *ctx, uint8_t c) {
     switch (c) {
         case 0x1b:
             ctx->osc_escape = true;
-            break;
+            return;
         case '\a':
-            goto cleanup;
+        default:
+            break;
     }
-
-    return;
 
 cleanup:
     ctx->osc_escape = false;
