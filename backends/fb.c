@@ -46,6 +46,19 @@ static uint8_t bump_alloc_pool[FLANTERM_FB_BUMP_ALLOC_POOL_SIZE];
 static size_t bump_alloc_ptr = 0;
 
 static void *bump_alloc(size_t s) {
+    static bool base_offset_added = false;
+    if (!base_offset_added) {
+        if ((uintptr_t)bump_alloc_pool & 0xf) {
+            bump_alloc_ptr += 0x10 - ((uintptr_t)bump_alloc_pool & 0xf);
+        }
+        base_offset_added = true;
+    }
+
+    if ((s & 0xf) != 0) {
+        s += 0x10;
+        s &= ~(size_t)0xf;
+    }
+
     size_t next_ptr = bump_alloc_ptr + s;
     if (next_ptr > FLANTERM_FB_BUMP_ALLOC_POOL_SIZE) {
         return NULL;
