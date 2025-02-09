@@ -59,6 +59,8 @@ struct flanterm_context {
 
     size_t tab_size;
     bool autoflush;
+    bool sixel_supported;
+    bool should_flush;
     bool cursor_enabled;
     bool scroll_enabled;
     bool control_sequence;
@@ -99,6 +101,7 @@ struct flanterm_context {
     size_t rows, cols;
 
     void (*raw_putchar)(struct flanterm_context *, uint8_t c);
+    void (*draw_sixel)(struct flanterm_context *, uint8_t *pixels, int width, int height, uint8_t *palette);
     void (*clear)(struct flanterm_context *, bool move);
     void (*set_cursor_pos)(struct flanterm_context *, size_t x, size_t y);
     void (*get_cursor_pos)(struct flanterm_context *, size_t *x, size_t *y);
